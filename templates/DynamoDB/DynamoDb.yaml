@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a DynamoDB table.
+
+Parameters:
+  TableName:
+    Type: String
+    Description: The name of the DynamoDB table to create.
+    Default: MyDynamoDBTable
+    MinLength: 3
+    MaxLength: 255
+    AllowedPattern: '^[a-zA-Z0-9_.-]+$'
+    ConstraintDescription: Must be a valid DynamoDB table name (letters, numbers, underscores, periods, and hyphens only).
+
+  ReadCapacityUnits:
+    Type: Number
+    Description: The number of read capacity units for the DynamoDB table.
+    Default: 1
+    MinValue: 1
+    MaxValue: 10000
+
+  WriteCapacityUnits:
+    Type: Number
+    Description: The number of write capacity units for the DynamoDB table.
+    Default: 1
+    MinValue: 1
+    MaxValue: 10000
+    ConstraintDescription: Must be between 1 and 10000.
+
+Resources:
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      AttributeDefinitions:
+        - AttributeName: PrimaryKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PrimaryKey
+          KeyType: HASH
+      # ProvisionedThroughput:
+      #   ReadCapacityUnits: !Ref ReadCapacityUnits
+      #   WriteCapacityUnits: !Ref WriteCapacityUnits
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: Development

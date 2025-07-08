@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an S3 bucket.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: The name of the S3 bucket to create.
+    Default: "my-s3-bucket"
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: '^[a-z0-9.-]+$'
+    ConstraintDescription: Must be a valid S3 bucket name (lowercase letters, numbers, periods, and hyphens only).
+
+  BucketVersioning:
+    Type: String
+    Description: Enable versioning for the S3 bucket.
+    Default: Enabled
+    AllowedValues:
+      - Enabled
+      - Suspended
+    ConstraintDescription: Must be either 'Enabled' or 'Suspended'.
+    NoEcho: true
+    MinLength: 7
+    MaxLength: 9
+    AllowedPattern: '^(Enabled|Suspended)$'
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: !Ref BucketVersioning
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  BucketName:
+    Description: Name of the S3 bucket
+    Value: !Ref MyS3Bucket
+    Export:
+      Name: S3BucketName

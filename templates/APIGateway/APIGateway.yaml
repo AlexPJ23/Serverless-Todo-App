@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for API Gateway
+
+Parameters:
+  LambdaFunctionArn:
+    Type: String
+    Description: The ARN of the Lambda function to integrate with the API Gateway.
+    MinLength: 1
+    MaxLength: 256
+    AllowedPattern: '^arn:aws:lambda:[a-z]{2}-[a-z]+-\d:\d{12}:function:[a-zA-Z0-9-_]+$'
+    ConstraintDescription: Must be a valid Lambda function ARN.
+
+  ApiGatewayName:
+    Type: String
+    Default: MyApiGateway
+    Description: The name of the API Gateway.
+    MinLength: 1
+    MaxLength: 64
+    AllowedPattern: '^[a-zA-Z0-9-_]+$'
+
+  ApiGatewayDescription:
+    Type: String
+    Default: API Gateway for the Serverless WebApp
+    MaxLength: 256
+    Description: A description for the API Gateway.
+
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - prod
+    Description: The stage name for the API Gateway.
+
+Resources:
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref ApiGatewayName
+      Description: !Ref ApiGatewayDescription
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: todos
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Content-Type: true
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: !Ref Stage
+    DependsOn: ApiGatewayMethod
+
+  LambdaApiGatewayInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunctionArn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/todos

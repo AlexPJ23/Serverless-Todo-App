@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a Lambda function.
+
+Parameters:
+  LambdaFunctionName:
+    Type: String
+    Description: The name of the Lambda function to create.
+    Default: MyLambdaFunction
+    MinLength: 1
+    MaxLength: 64
+    AllowedPattern: '^[a-zA-Z0-9-_]+$'
+    ConstraintDescription: Must be a valid Lambda function name (letters, numbers, hyphens, and underscores only).
+
+  LambdaTimeout:
+    Type: Number
+    Description: The timeout for the Lambda function in seconds.
+    Default: 15
+    MinValue: 1
+    MaxValue: 900
+    ConstraintDescription: Must be between 1 and 900 seconds.
+
+  LambdaMemorySize:
+    Type: Number
+    Description: The amount of memory allocated to the Lambda function in MB.
+    Default: 128
+    MinValue: 128
+    MaxValue: 10240
+    ConstraintDescription: Must be between 128 and 10240 MB.
+
+  LambdaRuntime:
+      Type: String
+      Description: The runtime for the Lambda function.
+      Default: python3.9
+      AllowedValues:
+        - nodejs18.x
+        - python3.9
+        - java11
+        - go1.x
+        - ruby2.7
+      ConstraintDescription: Must be a valid Lambda runtime.
+    
+  LambdaExecutionRoleArn:
+    Type: String
+    Description: The ARN of the IAM role that Lambda assumes when it executes the function.
+    MaxLength: 256
+    AllowedPattern: '^[a-zA-Z0-9:/_.-]+$'
+    ConstraintDescription: Must be a valid IAM role ARN (letters, numbers, colons, slashes, underscores, periods, and hyphens only).
+
+Resources:
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Handler: index.handler
+      Runtime: !Ref LambdaRuntime
+      Code:
+        S3Bucket: !ImportValue S3BucketName
+        S3Key: my-lambda-code.zip
+      Role: !Ref LambdaExecutionRoleArn
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemorySize
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MyLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaBasicExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt MyLambdaFunction.Arn
+    Export:
+      Name: LambdaFunctionArn
