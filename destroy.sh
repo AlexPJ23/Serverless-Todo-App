@@ -7,10 +7,10 @@ if [[ -z "$ENV" ]]; then
 fi
 
 templates=(
-  "S3"
   "Lambda"
   "DynamoDB"
   "APIGateway"
+  "S3"
 )
 
 # Delete Lambda code from S3

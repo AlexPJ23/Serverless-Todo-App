@@ -47,7 +47,9 @@ do
   else
     if [[ "$STACK" == "APIGateway" ]]; then
       # APIGateway stack requires a special parameter for the stage name
-      PARAMS_OPTION="--parameters ParameterKey=LambdaFunctionArn,ParameterValue=$(aws cloudformation list-exports --query \"Exports[?Name=='LambdaFunctionArn'].Value\" --output text)"
+      LAMBDA_ARN=$(aws cloudformation list-exports --query "Exports[?Name=='LambdaFunctionArn'].Value" --output text)
+      PARAMS_OPTION="--parameters ParameterKey=LambdaFunctionArn,ParameterValue=$LAMBDA_ARN"
+      echo "$PARAMS_OPTION"
     else
       PARAMS_OPTION="--parameters file://$PARAMS_FILE"
     fi
@@ -64,6 +66,7 @@ do
     aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
 
     echo "✅ Stack $STACK_NAME created."
+
 
 
     if [[ "$STACK" == "S3" ]]; then

@@ -1,9 +1,9 @@
 import boto3
 from botocore.exceptions import ClientError
 import json
-
+# Initialize the DynamoDB resource
 dynamodb = boto3.resource('dynamodb')
-# L
+endpoint_url = 'http://localhost:8000'  # Local DynamoDB endpoint for testing
 
 
 def lambda_handler(event, _):
