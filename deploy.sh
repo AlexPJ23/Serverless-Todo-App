@@ -13,6 +13,7 @@ templates=(
   "Lambda"
   "DynamoDB"
   "APIGateway"
+  "ECS"
 )
 
 # Zip the Lambda code

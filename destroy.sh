@@ -10,6 +10,7 @@ templates=(
   "Lambda"
   "DynamoDB"
   "APIGateway"
+  "ECS"
   "S3"
 )
 
@@ -37,6 +38,10 @@ do
 
   TEMPLATE_FILE="./templates/${STACK}/${STACK}.yaml"
   STACK_NAME="${STACK}-${ENV}"
+
+  if [[ "$STACK" == "S3" ]]; then
+    python ./delete_s3.py
+  fi
 
   # Check if stack exists
   if aws cloudformation describe-stacks --stack-name "$STACK_NAME" &> /dev/null; then

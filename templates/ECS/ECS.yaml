@@ -1,2 +1,174 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to create a Lambda function.
+Description: ECS EC2 launch type - Minimal working setup
+
+Parameters:
+
+  ECSAMI:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
+
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: my-key-pair
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    MaxLength: 64
+    MinLength: 1
+    ConstraintDescription: Must be a valid EC2 KeyPair name.
+    Description: Name of an existing EC2 KeyPair to SSH into ECS instances
+
+Resources:
+
+  # VPC + Subnet + IGW + Route Table
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+
+  MySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+
+  MyInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref MyInternetGateway
+
+  MyRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+
+  MyRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref MyRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyInternetGateway
+
+  MySubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet
+      RouteTableId: !Ref MyRouteTable
+
+  # Security Group
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  
+
+  # ECS Cluster
+  MyECSCluster:
+    Type: AWS::ECS::Cluster
+
+  # IAM Role for ECS EC2 Instances
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref ECSRole]
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+
+  # EC2 instance (ECS container instance)
+  ECSInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      KeyName: !Ref KeyName
+      ImageId: !Ref ECSAMI
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref MySubnet
+          GroupSet: [!Ref MySecurityGroup]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo ECS_CLUSTER=${MyECSCluster} >> /etc/ecs/ecs.config
+          sudo systemctl start ecs
+          systemctl enable --now ecs
+
+  # Task Role
+  MyECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # ECS Task Definition
+  MyTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      RequiresCompatibilities: [EC2]
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: bridge
+      TaskRoleArn: !GetAtt MyECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: webapp-container
+          Image: nginx:latest
+          Memory: 512
+          Cpu: 256
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+              HostPort: 0
+      ExecutionRoleArn: !GetAtt MyECSTaskRole.Arn
+  # ECS Service
+  MyService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref MyECSCluster
+      DesiredCount: 1
+      TaskDefinition: !Ref MyTaskDef
+      LaunchType: EC2
+
+Outputs:
+  PublicIP:
+    Description: Public IP of ECS EC2 instance
+    Value: !GetAtt ECSInstance.PublicIp
