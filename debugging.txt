@@ -1,0 +1,3 @@
+sudo systemctl status ecs
+sudo systemctl status docker
+cat /etc/ecs/ecs.config
