@@ -12,6 +12,8 @@
 - Environment variables
 - CORS
 - SDK usage
+- EC2 AMI
+- ECS
 
 ### What to Build
 A simple to-do list app.
